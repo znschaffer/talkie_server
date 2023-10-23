@@ -6,7 +6,14 @@ let state = {
   chat: [],
 };
 wss.on("connection", function connection(ws) {
+  // catch client up with current state
+  ws.send(JSON.stringify(state), { binary: false });
+
   ws.on("error", console.error);
+
+  ws.on("open", function open() {
+    console.log("new connection");
+  });
 
   ws.on("message", function message(data, isBinary) {
     console.log(data);
