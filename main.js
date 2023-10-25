@@ -22,27 +22,69 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const ws_1 = __importStar(require("ws"));
+const node_crypto_1 = __importDefault(require("node:crypto"));
+const Data = __importStar(require("./data"));
 const wss = new ws_1.WebSocketServer({ port: 9002 });
-let state = {
-    chat: [],
-};
+let rooms = new Set();
 wss.on("connection", function connection(ws) {
+    let currentRoom = null;
     // catch client up with current state
-    ws.send(JSON.stringify(state), { binary: false });
     ws.on("error", console.error);
     ws.on("open", function open() {
         console.log("new connection");
     });
-    ws.on("message", function message(data, isBinary) {
-        console.log(data);
-        console.log(JSON.parse(data.toString()));
-        state.chat.push(JSON.parse(data.toString()));
-        wss.clients.forEach(function each(client) {
-            if (client.readyState === ws_1.default.OPEN) {
-                client.send(JSON.stringify(state), { binary: false });
-            }
-        });
+    ws.on("message", function message(message, isBinary) {
+        const data = JSON.parse(message.toString());
+        handleData(data, ws);
     });
 });
+function handleData(data, ws) {
+    switch (data.type) {
+        case Data.DataType.MESSAGE: {
+            const message = data;
+            for (let room of rooms.keys()) {
+                if (room.id == message.roomId) {
+                    // send message to the room with the message id
+                    room.messageLog.push(message);
+                    room.clients.forEach((client) => {
+                        if (client.readyState === ws_1.default.OPEN) {
+                            client.send(JSON.stringify(message), { binary: false });
+                        }
+                    });
+                }
+            }
+            break;
+        }
+        case Data.DataType.CREATE: {
+            const create = data;
+            let roomId = node_crypto_1.default.randomUUID();
+            rooms.add({
+                id: roomId,
+                clients: new Set().add(ws),
+                messageLog: [],
+            });
+            ws.send(JSON.stringify({ roomId: roomId }));
+            break;
+        }
+        case Data.DataType.JOIN: {
+            const join = data;
+            for (let room of rooms.keys()) {
+                if ((room.id = join.room)) {
+                    room.clients.add(ws);
+                    // playback : configurable?
+                    room.messageLog.forEach((msg) => {
+                        ws.send(JSON.stringify(msg));
+                    });
+                }
+            }
+            break;
+        }
+        default:
+            console.error("Unknown data type: ", data.type, " in ", data);
+    }
+}

@@ -10,6 +10,7 @@ export interface Data {
 
 export interface Message extends Data {
   type: DataType.MESSAGE;
+  roomId: string;
   username: string;
   message: string;
   timestamp: string;
