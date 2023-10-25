@@ -26,8 +26,13 @@ wss.on("connection", function connection(ws) {
   });
 
   ws.on("message", function message(message, isBinary) {
-    const data: Data.Data = JSON.parse(message.toString());
-    handleData(data, ws);
+    try {
+      const data: Data.Data = JSON.parse(message.toString());
+      handleData(data, ws);
+    } catch {
+      console.error("Bad JSON: ", message.toString());
+      ws.send(JSON.stringify({ error: "Bad JSON" }));
+    }
   });
 });
 
