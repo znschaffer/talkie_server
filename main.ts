@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import * as Data from "./data";
 
 const wss = new WebSocketServer({ port: 9002 });
+const logger = require("pino");
 
 type State = {
   chat: Data.Message[];
@@ -26,6 +27,7 @@ wss.on("connection", function connection(ws) {
   });
 
   ws.on("message", function message(message, isBinary) {
+    logger.info(message.toString());
     try {
       const data: Data.Data = JSON.parse(message.toString());
       handleData(data, ws);
