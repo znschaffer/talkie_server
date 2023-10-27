@@ -3,11 +3,10 @@ import crypto from "node:crypto";
 import * as Data from "./data";
 
 const wss = new WebSocketServer({ port: 9002 });
-const logger = require("pino");
+import logger from "pino";
 
-type State = {
-  chat: Data.Message[];
-};
+// setup logger
+const log = logger();
 
 type Room = {
   clients: Set<WebSocket>;
@@ -18,7 +17,6 @@ type Room = {
 let rooms = new Set<Room>();
 
 wss.on("connection", function connection(ws) {
-  let currentRoom = null;
   // catch client up with current state
   ws.on("error", console.error);
 
@@ -27,7 +25,8 @@ wss.on("connection", function connection(ws) {
   });
 
   ws.on("message", function message(message, isBinary) {
-    logger.info(message.toString());
+    // log incoming messages
+    log.info(message.toString());
     try {
       const data: Data.Data = JSON.parse(message.toString());
       handleData(data, ws);
