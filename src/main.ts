@@ -14,21 +14,60 @@ const fileTransport = pino.transport({
 
 const log = pino({}, fileTransport);
 
-type Room = {
+/**
+ * A talkie room
+ *
+ *
+ */
+class Room {
   clients: Set<WebSocket>;
   messageLog: Message[];
-};
+  /**
+   * Create a room.
+   * @param {WebSocket} initialConnection The first connection to a room
+   */
+  constructor(initialConnection: WebSocket | null) {
+    this.clients = new Set<WebSocket>();
+    if (initialConnection) {
+      this.clients.add(initialConnection);
+    }
+    this.messageLog = [];
+  }
+  /**
+   * Replays all logged messages to websocket
+   *  @method
+   *  @param {WebSocket} ws WebSocket to send messages to
+   */
+  replay(ws: WebSocket) {
+    this.messageLog.forEach((msg) => {
+      ws.send(JSON.stringify(msg));
+    });
+  }
+
+  /**
+   *  Adds a message to the room log,
+   *  then sends it out to all connected clients
+   *  @method
+   *  @param {Message} message Message to send
+   */
+  sendMessage(message: Message) {
+    this.messageLog.push(message);
+
+    this.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message), { binary: false });
+      }
+    });
+  }
+}
 
 let rooms = new Map<string, Room>();
 
 wss.on("connection", function connection(ws) {
-  // catch client up with current state
   ws.on("error", (err) => log.error(err));
-
   ws.on("open", function open() {
     log.info("new connection");
   });
-
   ws.on("message", function message(message, isBinary) {
     // log incoming messages
     log.info(message.toString());
@@ -50,43 +89,22 @@ function handleData(data: Data, ws: WebSocket) {
       const message = data as Message;
       const room = rooms.get(message.roomId);
       if (room) {
-        rooms.set(message.roomId, {
-          ...room,
-          messageLog: [...room?.messageLog, message],
-        });
-
-        room.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(message), { binary: false });
-          }
-        });
+        room.sendMessage(message);
       }
       break;
     }
     case DataType.CREATE: {
       let roomId = crypto.randomUUID();
-
-      rooms.set(roomId, {
-        clients: new Set<WebSocket>().add(ws),
-        messageLog: [],
-      });
-
+      rooms.set(roomId, new Room(ws));
       ws.send(JSON.stringify({ roomId }));
       break;
     }
     case DataType.JOIN: {
       const join = data as Join;
-
       const room = rooms.get(join.roomId);
       if (room) {
-        rooms.set(join.roomId, {
-          ...room,
-          clients: room.clients.add(ws),
-        });
-
-        room.messageLog.forEach((msg) => {
-          ws.send(JSON.stringify(msg));
-        });
+        room.clients.add(ws);
+        room.replay(ws);
       }
 
       break;
@@ -95,7 +113,6 @@ function handleData(data: Data, ws: WebSocket) {
       const del = data as Delete;
       rooms.delete(del.roomId);
     }
-
     default:
       console.error("Unknown data type: ", data.type, " in ", data);
   }

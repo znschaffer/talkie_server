@@ -30,3 +30,4 @@ export interface Delete extends Data {
   type: DataType.DELETE;
   roomId: string;
 }
+
