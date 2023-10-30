@@ -2,11 +2,17 @@ import WebSocket, { WebSocketServer } from "ws";
 import crypto from "node:crypto";
 
 const wss = new WebSocketServer({ port: 9002 });
-import logger from "pino";
 import { Create, Data, DataType, Delete, Join, Message } from "./data";
+import pino from "pino";
 
 // setup logger
-const log = logger();
+
+const fileTransport = pino.transport({
+  target: "pino/file",
+  options: { destination: `${__dirname}/talkie.log` },
+});
+
+const log = pino({}, fileTransport);
 
 type Room = {
   clients: Set<WebSocket>;
@@ -17,10 +23,10 @@ let rooms = new Map<string, Room>();
 
 wss.on("connection", function connection(ws) {
   // catch client up with current state
-  ws.on("error", console.error);
+  ws.on("error", (err) => log.error(err));
 
   ws.on("open", function open() {
-    console.log("new connection");
+    log.info("new connection");
   });
 
   ws.on("message", function message(message, isBinary) {
@@ -31,7 +37,9 @@ wss.on("connection", function connection(ws) {
       handleData(data, ws);
     } catch {
       console.error("Bad JSON: ", message.toString());
-      ws.send(JSON.stringify({ error: "Bad JSON" }));
+      const resp = { error: "Bad JSON" };
+      log.error(resp);
+      ws.send(JSON.stringify(resp));
     }
   });
 });
