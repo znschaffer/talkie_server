@@ -1,20 +1,19 @@
 import WebSocket, { WebSocketServer } from "ws";
 import crypto from "node:crypto";
-import * as Data from "./data";
 
 const wss = new WebSocketServer({ port: 9002 });
 import logger from "pino";
+import { Create, Data, DataType, Delete, Join, Message } from "./data";
 
 // setup logger
 const log = logger();
 
 type Room = {
   clients: Set<WebSocket>;
-  messageLog: Data.Message[];
-  id: string;
+  messageLog: Message[];
 };
 
-let rooms = new Set<Room>();
+let rooms = new Map<string, Room>();
 
 wss.on("connection", function connection(ws) {
   // catch client up with current state
@@ -28,7 +27,7 @@ wss.on("connection", function connection(ws) {
     // log incoming messages
     log.info(message.toString());
     try {
-      const data: Data.Data = JSON.parse(message.toString());
+      const data: Data = JSON.parse(message.toString());
       handleData(data, ws);
     } catch {
       console.error("Bad JSON: ", message.toString());
@@ -37,49 +36,56 @@ wss.on("connection", function connection(ws) {
   });
 });
 
-function handleData(data: Data.Data, ws: WebSocket) {
+function handleData(data: Data, ws: WebSocket) {
   switch (data.type) {
-    case Data.DataType.MESSAGE: {
-      const message = data as Data.Message;
-      for (let room of rooms.keys()) {
-        if (room.id == message.roomId) {
-          // send message to the room with the message id
-          room.messageLog.push(message);
+    case DataType.MESSAGE: {
+      const message = data as Message;
+      const room = rooms.get(message.roomId);
+      if (room) {
+        rooms.set(message.roomId, {
+          ...room,
+          messageLog: [...room?.messageLog, message],
+        });
 
-          room.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify(message), { binary: false });
-            }
-          });
-        }
+        room.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(message), { binary: false });
+          }
+        });
       }
       break;
     }
-    case Data.DataType.CREATE: {
-      const create = data as Data.Create;
+    case DataType.CREATE: {
       let roomId = crypto.randomUUID();
-      rooms.add({
-        id: roomId,
+
+      rooms.set(roomId, {
         clients: new Set<WebSocket>().add(ws),
         messageLog: [],
       });
-      ws.send(JSON.stringify({ roomId: roomId }));
+
+      ws.send(JSON.stringify({ roomId }));
       break;
     }
-    case Data.DataType.JOIN: {
-      const join = data as Data.Join;
-      for (let room of rooms.keys()) {
-        if ((room.id = join.room)) {
-          room.clients.add(ws);
+    case DataType.JOIN: {
+      const join = data as Join;
 
-          // playback : configurable?
-          room.messageLog.forEach((msg) => {
-            ws.send(JSON.stringify(msg));
-          });
-        }
+      const room = rooms.get(join.roomId);
+      if (room) {
+        rooms.set(join.roomId, {
+          ...room,
+          clients: room.clients.add(ws),
+        });
+
+        room.messageLog.forEach((msg) => {
+          ws.send(JSON.stringify(msg));
+        });
       }
 
       break;
+    }
+    case DataType.DELETE: {
+      const del = data as Delete;
+      rooms.delete(del.roomId);
     }
 
     default:
