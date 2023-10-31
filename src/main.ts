@@ -2,8 +2,9 @@ import WebSocket, { WebSocketServer } from "ws";
 import crypto from "node:crypto";
 
 const wss = new WebSocketServer({ port: 9002 });
-import { Create, Data, DataType, Delete, Join, Message } from "./data";
+import { Data, DataType, Delete, Join, Message } from "./types/data";
 import pino from "pino";
+import { Room } from "./lib/Room";
 
 // setup logger
 
@@ -14,57 +15,10 @@ const fileTransport = pino.transport({
 
 const log = pino({}, fileTransport);
 
-/**
- * A talkie room
- *
- *
- */
-class Room {
-  clients: Set<WebSocket>;
-  messageLog: Message[];
-  /**
-   * Create a room.
-   * @param {WebSocket} initialConnection The first connection to a room
-   */
-  constructor(initialConnection: WebSocket | null) {
-    this.clients = new Set<WebSocket>();
-    if (initialConnection) {
-      this.clients.add(initialConnection);
-    }
-    this.messageLog = [];
-  }
-  /**
-   * Replays all logged messages to websocket
-   *  @method
-   *  @param {WebSocket} ws WebSocket to send messages to
-   */
-  replay(ws: WebSocket) {
-    this.messageLog.forEach((msg) => {
-      ws.send(JSON.stringify(msg));
-    });
-  }
-
-  /**
-   *  Adds a message to the room log,
-   *  then sends it out to all connected clients
-   *  @method
-   *  @param {Message} message Message to send
-   */
-  sendMessage(message: Message) {
-    this.messageLog.push(message);
-
-    this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify(message), { binary: false });
-      }
-    });
-  }
-}
-
 let rooms = new Map<string, Room>();
 
 wss.on("connection", function connection(ws) {
-  ws.on("error", (err) => log.error(err));
+  ws.on("error", log.error);
   ws.on("open", function open() {
     log.info("new connection");
   });
@@ -106,7 +60,6 @@ function handleData(data: Data, ws: WebSocket) {
         room.clients.add(ws);
         room.replay(ws);
       }
-
       break;
     }
     case DataType.DELETE: {
