@@ -3,6 +3,7 @@ import WebSocket from "ws";
 
 /** A talkie room */
 export class Room {
+  id: string;
   clients: Set<WebSocket>;
   messageLog: Message[];
 
@@ -10,8 +11,9 @@ export class Room {
    * Create a room.
    * @param {WebSocket} initialConnection The first connection to a room
    */
-  public constructor(initialConnection: WebSocket | null) {
+  public constructor(initialConnection: WebSocket | null, id: string) {
     this.clients = new Set<WebSocket>();
+    this.id = id;
     if (initialConnection) {
       this.clients.add(initialConnection);
     }

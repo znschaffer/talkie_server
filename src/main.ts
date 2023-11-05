@@ -48,8 +48,8 @@ function handleData(data: Data, ws: WebSocket) {
       break;
     }
     case DataType.CREATE: {
-      let roomId = crypto.randomUUID();
-      rooms.set(roomId, new Room(ws));
+      let roomId = crypto.randomUUID()
+      rooms.set(roomId, new Room(ws, roomId));
       ws.send(JSON.stringify({ roomId }));
       break;
     }
