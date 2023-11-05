@@ -19,6 +19,13 @@ let rooms = new Map<string, Room>();
 
 wss.on("connection", function connection(ws) {
   ws.on("error", log.error);
+  ws.on("close", function close(code) {
+    console.log("purge")
+    rooms.forEach((room) => {
+      room.clients.delete(ws);
+    })
+
+  })
   ws.on("open", function open() {
     log.info("new connection");
   });
@@ -52,8 +59,7 @@ function handleData(data: Data, ws: WebSocket) {
     case DataType.CREATE: {
       let roomId = crypto.randomUUID()
       let room = new Room(roomId);
-      room.clients.push(ws);
-      log.debug(room.clients.length);
+      room.clients.add(ws);
       rooms.set(roomId, room);
       let resp = { type: DataType.CREATE, roomId: roomId }
       ws.send(JSON.stringify(resp));
@@ -63,7 +69,7 @@ function handleData(data: Data, ws: WebSocket) {
       const join = data as Join;
       const room = rooms.get(join.roomId);
       if (room) {
-        room.clients.push(ws);
+        room.clients.add(ws);
         let resp = { type: DataType.JOIN, roomId: join.roomId }
         ws.send(JSON.stringify(resp))
         room.replay(ws);

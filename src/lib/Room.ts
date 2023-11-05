@@ -4,7 +4,7 @@ import WebSocket from "ws";
 /** A talkie room */
 export class Room {
   id: string;
-  clients: WebSocket[];
+  clients: Set<WebSocket>;
   messageLog: Message[];
 
   /**
@@ -12,7 +12,7 @@ export class Room {
    * @param {WebSocket} initialConnection The first connection to a room
    */
   public constructor(id: string) {
-    this.clients = [];
+    this.clients = new Set<WebSocket>();
     this.id = id;
     this.messageLog = [];
   }
@@ -34,9 +34,6 @@ export class Room {
    */
   public sendMessage(message: Message) {
     this.messageLog.push(message);
-
-    console.log(message)
-    console.log(this.clients.length);
     this.clients.forEach((client) => {
       if (client.readyState === 1)
         client.send(JSON.stringify(message), { binary: false });
