@@ -4,21 +4,19 @@ import WebSocket from "ws";
 /** A talkie room */
 export class Room {
   id: string;
-  clients: Set<WebSocket>;
+  clients: WebSocket[];
   messageLog: Message[];
 
   /**
    * Create a room.
    * @param {WebSocket} initialConnection The first connection to a room
    */
-  public constructor(initialConnection: WebSocket | null, id: string) {
-    this.clients = new Set<WebSocket>();
+  public constructor(id: string) {
+    this.clients = [];
     this.id = id;
-    if (initialConnection) {
-      this.clients.add(initialConnection);
-    }
     this.messageLog = [];
   }
+
   /**
    * Replays all logged messages to websocket
    *  @param {WebSocket} ws WebSocket to send messages to
@@ -37,10 +35,10 @@ export class Room {
   public sendMessage(message: Message) {
     this.messageLog.push(message);
 
+    console.log(this.clients);
     this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
+      if (client.readyState === 1)
         client.send(JSON.stringify(message), { binary: false });
-      }
     });
   }
 }

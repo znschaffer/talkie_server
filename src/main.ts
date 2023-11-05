@@ -13,7 +13,7 @@ const fileTransport = pino.transport({
   options: { destination: `${__dirname}/talkie.log` },
 });
 
-const log = pino({}, fileTransport);
+const log = pino({ level: "debug" });
 
 let rooms = new Map<string, Room>();
 
@@ -24,7 +24,7 @@ wss.on("connection", function connection(ws) {
   });
   ws.on("message", function message(message, isBinary) {
     // log incoming messages
-    log.info(message.toString());
+    // log.info(message.toString())
     try {
       const data: Data = JSON.parse(message.toString());
       handleData(data, ws);
@@ -41,7 +41,9 @@ function handleData(data: Data, ws: WebSocket) {
   switch (data.type) {
     case DataType.MESSAGE: {
       const message = data as Message;
+      // log.info(message.roomId)
       const room = rooms.get(message.roomId);
+      // log.debug(room)
       if (room) {
         room.sendMessage(message);
       }
@@ -49,15 +51,21 @@ function handleData(data: Data, ws: WebSocket) {
     }
     case DataType.CREATE: {
       let roomId = crypto.randomUUID()
-      rooms.set(roomId, new Room(ws, roomId));
-      ws.send(JSON.stringify({ roomId }));
+      let room = new Room(roomId);
+      room.clients.push(ws);
+      log.debug(room);
+      rooms.set(roomId, room);
+      let resp = { type: DataType.CREATE, roomId: roomId }
+      ws.send(JSON.stringify(resp));
       break;
     }
     case DataType.JOIN: {
       const join = data as Join;
       const room = rooms.get(join.roomId);
       if (room) {
-        room.clients.add(ws);
+        room.clients.push(ws);
+        let resp = { type: DataType.JOIN, roomId: join.roomId }
+        ws.send(JSON.stringify(resp))
         room.replay(ws);
       }
       break;
