@@ -35,7 +35,8 @@ export class Room {
   public sendMessage(message: Message) {
     this.messageLog.push(message);
 
-    console.log(this.clients);
+    console.log(message)
+    console.log(this.clients.length);
     this.clients.forEach((client) => {
       if (client.readyState === 1)
         client.send(JSON.stringify(message), { binary: false });

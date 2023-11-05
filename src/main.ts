@@ -53,7 +53,7 @@ function handleData(data: Data, ws: WebSocket) {
       let roomId = crypto.randomUUID()
       let room = new Room(roomId);
       room.clients.push(ws);
-      log.debug(room);
+      log.debug(room.clients.length);
       rooms.set(roomId, room);
       let resp = { type: DataType.CREATE, roomId: roomId }
       ws.send(JSON.stringify(resp));
